@@ -1,0 +1,13 @@
+{
+  "name": "@pdf-editor/pdf-reader",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": { ".": "./src/index.js" },
+  "dependencies": {
+    "pdfjs-dist": "^6.1.200"
+  },
+  "devDependencies": {
+    "pdf-lib": "^1.17.1"
+  }
+}
