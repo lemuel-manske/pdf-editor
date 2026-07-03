@@ -47,60 +47,159 @@ The overlay approach uses two libraries with opposite jobs:
   text onto the real page objects, and serializes back to PDF bytes without
   rasterizing the original.
 
-Because both run fully in the browser, GitHub Pages (static hosting, no backend)
-is a natural fit and gives a strong privacy story: the PDF stays local, and
-"export" simply generates a new PDF blob for download.
+Both run fully in the browser, so GitHub Pages (static hosting, no backend) is a
+natural fit and gives a strong privacy story: the PDF stays local, and "export"
+simply generates a new PDF blob for download.
 
-## 3. Tech stack
+## 3. Architecture — ports & adapters (hexagonal)
 
-| Concern     | Choice                                             |
-| ----------- | -------------------------------------------------- |
-| Language    | Plain JavaScript (ES modules) — no TypeScript      |
-| Dev / build | Vite                                               |
-| UI          | Lit web components (plain-JS `static properties`)  |
-| Shared state| `@lit/context` + a Reactive Controller             |
-| Render      | PDF.js (`pdfjs-dist`) — current page → `<canvas>`  |
-| Export      | pdf-lib — draw text into original bytes, save      |
-| Tests       | Vitest (pure-core unit tests)                      |
-| Hosting     | GitHub Pages via GitHub Actions                    |
-
-## 4. Architecture — three layers
+The domain never talks to PDF.js or pdf-lib directly. Instead it defines two
+**ports** (contracts describing what the app needs), and each third-party library
+is wrapped by an **adapter** that implements a port. Dependencies point inward:
+the core depends on nothing; adapters depend only on their library; the UI depends
+on the core; and only the composition root knows the concrete adapters.
 
 ```
-<pdf-editor>  ── provides DocumentStore via @lit/context ──┐
-  <editor-toolbar>   open · text tool · size · color · export
-  <page-nav>         ◀ prev   page 2 / 8   next ▶
-  <pdf-page>                                               │
-    ┌───────────────────────────────────────────┐         │
-    │ INTERACTION overlay (absolutely-positioned  │  ← <text-box> components
-    │   <text-box> elements, contenteditable)     │         │
-    ├───────────────────────────────────────────┤         │
-    │ RENDER <canvas>  (PDF.js draws current page)│  ← imperative, stable node
-    └───────────────────────────────────────────┘         │
-  original pdfBytes (Uint8Array, kept for export) ─────────┘
+            ┌──────────────────────────────────────────┐
+            │              apps/web                      │
+            │        (composition root, Vite)            │
+            │  builds adapters, injects into store,      │
+            │  mounts <pdf-editor>, deploys to Pages     │
+            └───────┬───────────┬───────────┬───────────┘
+                    │ injects   │ injects   │ renders
+        ┌───────────▼──┐   ┌────▼─────────┐ │
+        │ @pdf-editor/ │   │ @pdf-editor/ │ │
+        │  pdf-reader  │   │  pdf-writer  │ │
+        │ (pdf.js)     │   │ (pdf-lib)    │ │
+        │ implements   │   │ implements   │ │
+        │ PdfRenderer  │   │ PdfExporter  │ │
+        └───────┬──────┘   └──────┬───────┘ │
+                │  port            │  port   │
+                ▼  contracts       ▼         ▼
+            ┌──────────────────────────┐  ┌───────────────────────┐
+            │     @pdf-editor/core      │◄─┤  @pdf-editor/components│
+            │ DocumentStore · model ·   │  │ Lit web components +   │
+            │ ports (PdfRenderer,       │  │ store-context +        │
+            │ PdfExporter contracts)    │  │ store-controller       │
+            │ (no Lit, no pdf libs)     │  │ (depends on core)      │
+            └──────────────────────────┘  └───────────────────────┘
 ```
 
-- **Render layer:** PDF.js draws the current page to a `<canvas>`.
-- **Interaction layer:** an absolutely-positioned overlay hosts `<text-box>`
+### Layer responsibilities
+
+- **Render (view):** PDF.js draws the current page to a `<canvas>`, behind the
+  `PdfRenderer` port.
+- **Interaction:** an absolutely-positioned overlay hosts `<text-box>`
   components; the browser provides caret/selection/typing natively.
-- **State/document layer:** a framework-free store holds all document state; the
-  original bytes are retained for export.
+- **State/application:** a framework-free `DocumentStore` holds all document
+  state and orchestrates the ports; the original bytes are retained for export.
+- **Write (export):** pdf-lib bakes text into the original bytes, behind the
+  `PdfExporter` port.
 
-Core (non-view) logic is separated from components so it is unit-testable without
-a DOM.
+## 4. Monorepo layout (npm workspaces)
 
-## 5. State model and store
+```
+pdf-editor/                         # monorepo root
+├─ package.json                     # { "workspaces": ["apps/*", "packages/*"] }, root scripts
+├─ vitest.config.js                 # runs tests across workspaces
+├─ .github/workflows/deploy.yml     # build apps/web, deploy to Pages
+├─ docs/superpowers/specs/…
+├─ apps/
+│  └─ web/                          # deployable app (private, not published)
+│     ├─ index.html
+│     ├─ vite.config.js             # base: '/pdf-editor/'
+│     ├─ package.json               # deps: all @pdf-editor/* packages
+│     └─ src/main.js                # composition root: build adapters + store, mount app
+└─ packages/
+   ├─ core/
+   │  ├─ package.json               # name: @pdf-editor/core ; deps: none
+   │  ├─ src/
+   │  │  ├─ index.js                # public exports
+   │  │  ├─ document-store.js       # state + intent methods + subscribe; injected ports
+   │  │  ├─ model.js                # TextBox factory + typedef
+   │  │  └─ ports/
+   │  │     ├─ pdf-renderer.js      # PdfRenderer / PdfDocument / PdfPage / RenderedPage typedefs
+   │  │     └─ pdf-exporter.js      # PdfExporter typedef
+   │  └─ test/document-store.test.js  # fake adapters (stubs)
+   ├─ pdf-reader/
+   │  ├─ package.json               # name: @pdf-editor/pdf-reader ; deps: pdfjs-dist
+   │  ├─ src/index.js               # createPdfReader() : PdfRenderer
+   │  └─ test/pdf-reader.test.js    # integration: real pdf.js + PDF fixture
+   ├─ pdf-writer/
+   │  ├─ package.json               # name: @pdf-editor/pdf-writer ; deps: pdf-lib
+   │  ├─ src/index.js               # createPdfWriter() : PdfExporter
+   │  └─ test/pdf-writer.test.js    # integration: real pdf-lib + PDF fixture
+   └─ components/
+      ├─ package.json               # name: @pdf-editor/components ; deps: lit, @lit/context, @pdf-editor/core
+      └─ src/
+         ├─ index.js                # imports/registers all components
+         ├─ pdf-editor.js
+         ├─ editor-toolbar.js
+         ├─ pdf-page.js
+         ├─ text-box.js
+         ├─ page-nav.js
+         ├─ store-context.js        # createContext(store)
+         └─ store-controller.js     # ReactiveController: consume context + subscribe
+```
 
-State lives in a plain, framework-free store — **not** in any component. This
-avoids a god-component and keeps components as thin views.
+**No per-package build step.** Packages ship ES-module source; their
+`package.json` `exports` points at `src/index.js`. Vite (in `apps/web`) resolves
+`@pdf-editor/*` to workspace source and bundles everything at the app level. If we
+ever publish to npm, we add build steps then (YAGNI now).
+
+## 5. Ports (contracts) — `@pdf-editor/core/src/ports/`
+
+Ports are plain-JS contracts documented with JSDoc typedefs (no runtime code).
+Adapters conform structurally; the domain and UI program against these shapes.
+
+### `PdfRenderer` (implemented by `@pdf-editor/pdf-reader`)
+
+```
+loadDocument(bytes: Uint8Array) : Promise<PdfDocument>
+
+PdfDocument = {
+  pageCount: number,
+  getPage(pageNumber /* 1-based */) : Promise<PdfPage>,
+}
+
+PdfPage = {
+  widthPt: number,
+  heightPt: number,
+  renderTo(canvas: HTMLCanvasElement, scale: number) : Promise<RenderedPage>,
+}
+
+RenderedPage = {                     // a page rendered at a specific scale
+  widthPx: number,
+  heightPx: number,
+  screenToPdf({ x, y })  : { xPt, yPt },
+  pdfToScreen({ xPt, yPt }) : { x, y },
+}
+```
+
+The renderer owns coordinate conversion (it holds the PDF.js viewport), so the
+domain and components never do viewport math. `RenderedPage` captures the
+scale-specific conversions produced by one render.
+
+### `PdfExporter` (implemented by `@pdf-editor/pdf-writer`)
+
+```
+exportPdf(originalBytes: Uint8Array, textBoxes: TextBox[]) : Promise<Uint8Array>
+```
+
+Given the original bytes and the boxes, it returns new PDF bytes with the text
+drawn into the real pages.
+
+## 6. Domain — `@pdf-editor/core`
+
+State lives in a plain store — **not** in any component — so there is no
+god-component and the core is pure and testable.
 
 ```
 DocumentStore state = {
   pdfBytes,        // Uint8Array — original file, reused on export
-  pdfDoc,          // PDF.js document (for rendering)
+  document,        // PdfDocument (port object) for the open file
   pageCount,
   currentPage,     // 1-based
-  scale,           // fit-to-width render scale
   textBoxes: [ TextBox ],   // across ALL pages
   selectedId,
 }
@@ -108,57 +207,61 @@ DocumentStore state = {
 TextBox = { id, page, xPt, yPt, text, fontSizePt, color }
 ```
 
-**Key decision:** each box's position is stored in **PDF points** (bottom-left
-origin, zoom-independent) as the single source of truth. Screen pixels are
-derived for display via the current render scale; export needs no extra math.
-A box is rendered only when `box.page === currentPage`.
+- **`document-store.js`** — receives the ports by injection
+  (`new DocumentStore({ renderer, exporter })`). Exposes intent-methods:
+  `openDocument(bytes)` (uses `renderer.loadDocument`), `setPage(n)`,
+  `addTextBox({ page, xPt, yPt }, defaults)`, `moveTextBox(id, { xPt, yPt })`,
+  `editText(id, text)`, `setStyle(id, { fontSizePt, color })`,
+  `deleteTextBox(id)`, `select(id)`, `exportPdf()` (uses
+  `exporter.exportPdf(pdfBytes, textBoxes)`), and `subscribe(listener)` returning
+  an unsubscribe. No Lit, no pdf libs → tested with fake ports (stubs).
+- **`model.js`** — `TextBox` factory/typedef; positions stored in **PDF points**
+  (bottom-left origin, zoom-independent) as the single source of truth.
 
-### Store composition
+**Scale is a view concern, not domain state.** Fit-to-width scale and the current
+`RenderedPage` are held locally in `<pdf-page>`, which measures its container.
 
-- **`core/document-store.js`** — a plain JS class holding state and exposing
-  intent-methods: `openDocument(bytes)`, `setPage(n)`, `addTextBox(pt, defaults)`,
-  `moveTextBox(id, pt)`, `editText(id, text)`, `setStyle(id, {fontSizePt, color})`,
-  `deleteTextBox(id)`, `select(id)`, plus `subscribe(listener)` returning an
-  unsubscribe function. Zero Lit, zero DOM → tested directly with real objects
-  (no mocks). Exported as a class so tests build isolated instances.
-- **`core/store-context.js`** — `export const storeContext = createContext(...)`.
-- **`core/store-controller.js`** — a `ReactiveController` that both *consumes* the
-  store from context and *subscribes* to its changes
-  (`store.subscribe(() => host.requestUpdate())`), detaching in
-  `hostDisconnected()`. Each component does `this.store = new StoreController(this)`
-  and reads/calls the store through it.
-- **`<pdf-editor>`** creates the `DocumentStore` and provides it through a
-  `ContextProvider`. It contains no state itself — just layout and composition.
+## 7. Adapters
 
-## 6. Core modules (`src/core/`, pure and tested)
+### `@pdf-editor/pdf-reader` (PDF.js)
 
-- **`coords.js`** — screen ↔ PDF-point transforms. Built on PDF.js's own
-  `viewport.convertToPdfPoint()` / `convertToViewportPoint()` (handles scale and
-  rotation correctly), plus a **baseline offset**: pdf-lib's `drawText` anchors
-  text at the baseline (bottom-left origin), while a DOM text box is positioned by
-  its top-left. `coords.js` centralizes the font-ascent offset so a box's
-  on-screen position matches the exported position. This module is the heart of
-  "text lands where you put it."
-- **`exporter.js`** — takes `pdfBytes` + `textBoxes`, loads with pdf-lib, embeds
-  Helvetica, draws each box on its target page (splitting multi-line text with a
-  line-height offset), converts the hex color to `rgb()`, returns the new PDF
-  bytes.
-- **`document-store.js`** — state + intent-methods + subscribe (see §5).
-- **`pdf-loader.js`** — thin PDF.js wrapper: load a document from bytes, render a
-  page to a canvas at a given scale, compute fit-to-width scale from a container
-  width.
+`createPdfReader({ workerSrc }) : PdfRenderer`. Wraps `pdfjs-dist`. The worker URL
+is passed in by the composition root (keeps the adapter free of Vite-specific
+`?url` syntax). Implements `loadDocument`/`getPage`/`renderTo` and builds
+`RenderedPage` conversions from the PDF.js `viewport`
+(`viewport.convertToPdfPoint` / `convertToViewportPoint`).
 
-## 7. Components (`src/components/`, one component per file)
+### `@pdf-editor/pdf-writer` (pdf-lib)
 
-- **`pdf-editor.js`** — app shell; creates and provides the store via context;
-  composes toolbar, nav, and page. No state of its own.
+`createPdfWriter() : PdfExporter`. Wraps `pdf-lib`. On `exportPdf`: load bytes,
+embed Helvetica, and for each `TextBox` draw on its page with the **baseline
+offset** applied (DOM boxes are positioned by top-left; pdf-lib anchors text at
+the baseline — the adapter computes the ascent via the embedded font's metrics so
+display and export agree). Handles multi-line text (split on newline, line-height
+offset) and hex→`rgb()` color. Returns the new bytes.
+
+## 8. UI — `@pdf-editor/components` (Lit)
+
+Components are thin views. They import the store contract from
+`@pdf-editor/core`, read/call it through the controller, and use `RenderedPage`
+(a port object) for rendering/conversion — they never import PDF.js or pdf-lib.
+
+- **`store-context.js`** — `export const storeContext = createContext(...)`.
+- **`store-controller.js`** — a `ReactiveController` that consumes the store from
+  context *and* subscribes to its changes (`store.subscribe(() =>
+  host.requestUpdate())`), detaching in `hostDisconnected()`. Each component does
+  `this.store = new StoreController(this)`.
+- **`pdf-editor.js`** — receives the `DocumentStore` as a property (built by the
+  composition root) and provides it via `ContextProvider`; composes toolbar, nav,
+  page. No state of its own.
 - **`editor-toolbar.js`** — Open file · Text-tool toggle · font-size input ·
   color picker · Export. Size/color apply to the selected box and set defaults
   for new boxes.
-- **`pdf-page.js`** — renders the current page to a **stable** canvas node
-  (imperatively, via ref/query, so reactive re-render never recreates it), hosts
-  the overlay, and maps a click (when the text tool is active) to a PDF point to
-  create a new box.
+- **`pdf-page.js`** — measures its container for a fit-to-width scale; fetches the
+  current `PdfPage` and calls `renderTo(canvas, scale)` into a **stable** canvas
+  node (imperative, so reactive re-render never recreates it); keeps the resulting
+  `RenderedPage` for conversions; maps a click (Text tool active) to a PDF point
+  via `renderedPage.screenToPdf` and calls `store.addTextBox`.
 - **`text-box.js`** — one `contenteditable` element: drag to move, type to edit,
   ✕ / Delete to remove, click to select. Reads its data from the store.
 - **`page-nav.js`** — prev/next + page counter.
@@ -173,41 +276,33 @@ A box is rendered only when `box.page === currentPage`.
   `willUpdate()` computes derived values.
 - The `<text-box>` list is rendered with the `repeat()` directive keyed by `id`,
   so DOM nodes are reused and the caret/focus survives typing (gotcha #1).
-- The PDF `<canvas>` lives in a stable node and is drawn imperatively; reactive
+- The PDF `<canvas>` lives in a stable node, drawn imperatively; reactive
   re-render never recreates it (gotcha #1).
-- Children call store methods or dispatch semantic `CustomEvent`s; `composed: true`
-  only when an event must cross a shadow boundary.
+- Children call store methods or dispatch semantic `CustomEvent`s; `composed:
+  true` only when an event must cross a shadow boundary.
 - Scoped styles via `static styles = css\`…\``; theming via CSS custom properties /
   `::part()` where a parent must style a child.
 - Cross-cutting concerns (store subscription, later a drag controller) are
   Reactive Controllers, never tangled into `render()`.
 - Accessibility: real `<button>`s, labeled inputs, keyboard support (Delete
   removes the selected box, Escape deselects).
-- Small, single-purpose components: one component per file, view logic only;
-  everything non-view lives in `core/`.
+- Small, single-purpose components: one component per file, view logic only.
 - Controllers detach listeners in `hostDisconnected()`.
 
-## 8. Coordinate transform (the core logic)
+## 9. Composition root — `apps/web/src/main.js`
 
-- **`coords.screenToPdf(point, viewport)`** (on create/move): use the page's
-  PDF.js `viewport` (`page.getViewport({ scale })`) and
-  `viewport.convertToPdfPoint(x, y)`, wrapped for testability.
-- **`coords.pdfToScreen(point, viewport)`** (on render):
-  `viewport.convertToViewportPoint(xPt, yPt)` to position each `<text-box>` over
-  the canvas.
-- **Baseline offset:** display positions a box by its top-left; pdf-lib draws from
-  the baseline. `coords.js` applies a consistent font-ascent offset so display and
-  export agree.
-- MVP assumes page rotation is handled by the viewport methods; no manual rotation
-  math.
+```
+import workerSrc from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 
-## 9. Rendering flow (`<pdf-page>`)
+const renderer = createPdfReader({ workerSrc });   // @pdf-editor/pdf-reader
+const exporter = createPdfWriter();                // @pdf-editor/pdf-writer
+const store    = new DocumentStore({ renderer, exporter });  // @pdf-editor/core
 
-1. On page change or container resize, compute a fit-to-width `scale` and the
-   page `viewport` at that scale.
-2. Render the page imperatively into the stable canvas node at that scale.
-3. Size the overlay to match the canvas; render `<text-box>` elements for
-   `currentPage`, each positioned via `coords.pdfToScreen`.
+document.querySelector('pdf-editor').store = store; // provided via context
+```
+
+Only this file knows the concrete adapters and the Vite-specific worker URL — the
+single wiring point of the hexagon.
 
 ## 10. Interaction model
 
@@ -222,79 +317,62 @@ A box is rendered only when `box.page === currentPage`.
 - **Delete/deselect:** ✕ button or Delete key removes the selected box; Escape
   deselects.
 
-## 11. Export flow (`exporter.js`)
+## 11. Export flow
 
-`Export` → load `pdfBytes` with pdf-lib → embed Helvetica → for each `TextBox`:
-`page.drawText(text, { x: xPt, y: yPt, size: fontSizePt, color })` (multi-line
-split by newline with line-height offset) → `save()` → Blob → download as
+`Export` → `store.exportPdf()` → `pdf-writer` loads `pdfBytes`, embeds Helvetica,
+draws each `TextBox` on its page (baseline offset, multi-line, color) → returns
+new bytes → the toolbar wraps them in a Blob and downloads
 `<original-name>-edited.pdf`. Because positions are already in points, export
 needs no scale math.
 
-## 12. Project structure
+## 12. Testing strategy
 
-```
-pdf-editor/
-├─ index.html
-├─ vite.config.js              # base: '/pdf-editor/'
-├─ package.json
-├─ src/
-│  ├─ main.js                  # imports components, mounts <pdf-editor>
-│  ├─ components/
-│  │  ├─ pdf-editor.js
-│  │  ├─ editor-toolbar.js
-│  │  ├─ pdf-page.js
-│  │  ├─ text-box.js
-│  │  └─ page-nav.js
-│  └─ core/
-│     ├─ pdf-loader.js
-│     ├─ coords.js
-│     ├─ exporter.js
-│     ├─ document-store.js
-│     ├─ store-context.js
-│     └─ store-controller.js
-├─ test/
-│  ├─ coords.test.js
-│  ├─ exporter.test.js
-│  └─ document-store.test.js
-└─ .github/workflows/deploy.yml
-```
+Each package owns its tests. Real objects and real fixtures; single, focused
+asserts; stubs over mocks (matching the code style).
 
-## 13. Testing strategy
+- **`@pdf-editor/core`** — `document-store.test.js` injects hand-written **fake**
+  `PdfRenderer`/`PdfExporter` stubs (plain objects returning canned values). Tests
+  add/move/edit/style/delete/select/page-nav and export orchestration without any
+  library. No mocking framework.
+- **`@pdf-editor/pdf-reader`** — integration against real `pdfjs-dist` + a small
+  real PDF fixture: assert `pageCount`, page size, and a `screenToPdf` ↔
+  `pdfToScreen` round-trip.
+- **`@pdf-editor/pdf-writer`** — integration against real `pdf-lib` + a real
+  fixture: export a known `TextBox`, re-parse the output, assert the text is
+  present at the expected position (baseline offset correct).
+- **`@pdf-editor/components`** — minimal DOM tests kept for the MVP; the pure core
+  and adapters carry the coverage.
 
-Focus tests on the **pure core** (highest value, no mocking — matches the code
-style): real objects and real fixtures, single focused asserts.
+Root `npm test` runs Vitest across all workspaces.
 
-- **`coords`** — screen↔PDF round-trips and the baseline offset.
-- **`exporter`** — against a real small PDF fixture, assert the exported PDF
-  contains the expected text at the expected position (re-parse with pdf-lib or
-  extract text with PDF.js).
-- **`document-store`** — add/move/edit/style/delete/select transitions.
+## 13. Deployment (GitHub Pages)
 
-Component/DOM tests are kept minimal for the MVP; the pure core carries the
-coverage.
+- `apps/web/vite.config.js` sets `base: '/pdf-editor/'` (repo name) so asset URLs
+  resolve under the Pages path.
+- GitHub Actions: on push to `main` → `npm ci` (root, installs the whole
+  workspace) → `npm run build -w apps/web` → deploy `apps/web/dist/` with
+  `actions/deploy-pages`.
+- The PDF.js worker URL is produced by Vite's `?url` import in `main.js` and
+  injected into `createPdfReader`, so it resolves correctly on Pages.
 
-## 14. Deployment (GitHub Pages)
+## 14. Known gotchas / risks
 
-- `vite.config.js` sets `base: '/pdf-editor/'` (repo name) so asset URLs resolve
-  under the Pages path.
-- GitHub Actions: on push to `main` → `npm ci` → `npm run build` → deploy `dist/`
-  with `actions/deploy-pages`.
-- The PDF.js worker is wired via a Vite `?url` import
-  (`import workerSrc from 'pdfjs-dist/build/pdf.worker.min.mjs?url'`;
-  `GlobalWorkerOptions.workerSrc = workerSrc`) so it resolves correctly on Pages.
-
-## 15. Known gotchas / risks
-
-1. **Reactive re-render vs. live canvas & caret** — mitigated by an imperative,
-   stable canvas node and `repeat()`-keyed text boxes.
+1. **Reactive re-render vs. live canvas & caret** — imperative stable canvas node
+   and `repeat()`-keyed text boxes.
 2. **Shadow DOM + absolute positioning** — the page container is the positioning
    context; overlay boxes are absolutely positioned within it.
-3. **Baseline vs. top-left anchoring** — centralized in `coords.js` so display and
-   export stay consistent.
-4. **PDF.js worker path on GitHub Pages** — handled by the Vite `?url` import.
+3. **Baseline vs. top-left anchoring** — owned by the `pdf-writer` adapter using
+   the embedded font's metrics, so display and export agree.
+4. **DOM-vs-PDF font fidelity** — on-screen text uses a browser font while export
+   uses pdf-lib's Helvetica; metrics are close but not pixel-identical. Acceptable
+   for the MVP.
+5. **PDF.js worker path on GitHub Pages** — handled by the Vite `?url` import in
+   the composition root.
 
-## 16. Future / fast-follow (not in v1)
+## 15. Future / fast-follow (not in v1)
 
 Undo/redo (cheap now that state is centralized), zoom controls, additional font
 families and bold/italic, more overlay tools (shapes, images, signatures),
-persistence across refresh, continuous-scroll multi-page view.
+persistence across refresh, continuous-scroll multi-page view. New capabilities
+generally slot in as new adapters/ports or new components without touching the
+core.
