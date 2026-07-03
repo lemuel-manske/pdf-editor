@@ -84,4 +84,10 @@ export class DocumentStore {
     this.#state.textBoxes = this.#state.textBoxes.map((b) => (b.id === id ? { ...b, ...style } : b));
     this.#emit();
   }
+
+  deleteTextBox(id) {
+    this.#state.textBoxes = this.#state.textBoxes.filter((b) => b.id !== id);
+    if (this.#state.selectedId === id) this.#state.selectedId = null;
+    this.#emit();
+  }
 }

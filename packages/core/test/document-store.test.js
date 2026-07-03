@@ -134,3 +134,21 @@ describe('DocumentStore.setStyle', () => {
     expect(next.color).toBe('#00ff00');
   });
 });
+
+describe('DocumentStore.deleteTextBox', () => {
+  it('removes the target box', async () => {
+    const store = makeStore();
+    await store.openDocument(new Uint8Array([9]));
+    const box = store.addTextBox({ page: 1, xPt: 0, yPt: 0 });
+    store.deleteTextBox(box.id);
+    expect(store.state.textBoxes.length).toBe(0);
+  });
+
+  it('clears the selection when the selected box is deleted', async () => {
+    const store = makeStore();
+    await store.openDocument(new Uint8Array([9]));
+    const box = store.addTextBox({ page: 1, xPt: 0, yPt: 0 });
+    store.deleteTextBox(box.id);
+    expect(store.state.selectedId).toBe(null);
+  });
+});
