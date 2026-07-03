@@ -93,3 +93,25 @@ describe('DocumentStore.select', () => {
     expect(store.state.selectedId).toBe('t7');
   });
 });
+
+describe('DocumentStore.moveTextBox', () => {
+  it('updates the position of the target box', async () => {
+    const store = makeStore();
+    await store.openDocument(new Uint8Array([9]));
+    const box = store.addTextBox({ page: 1, xPt: 0, yPt: 0 });
+    store.moveTextBox(box.id, { xPt: 55, yPt: 66 });
+    const moved = store.state.textBoxes.find((b) => b.id === box.id);
+    expect({ xPt: moved.xPt, yPt: moved.yPt }).toEqual({ xPt: 55, yPt: 66 });
+  });
+});
+
+describe('DocumentStore.editText', () => {
+  it('updates the text of the target box', async () => {
+    const store = makeStore();
+    await store.openDocument(new Uint8Array([9]));
+    const box = store.addTextBox({ page: 1, xPt: 0, yPt: 0 });
+    store.editText(box.id, 'hello');
+    const edited = store.state.textBoxes.find((b) => b.id === box.id);
+    expect(edited.text).toBe('hello');
+  });
+});

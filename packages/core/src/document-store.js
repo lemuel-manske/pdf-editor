@@ -68,4 +68,14 @@ export class DocumentStore {
     this.#state.selectedId = id;
     this.#emit();
   }
+
+  moveTextBox(id, { xPt, yPt }) {
+    this.#state.textBoxes = this.#state.textBoxes.map((b) => (b.id === id ? { ...b, xPt, yPt } : b));
+    this.#emit();
+  }
+
+  editText(id, text) {
+    this.#state.textBoxes = this.#state.textBoxes.map((b) => (b.id === id ? { ...b, text } : b));
+    this.#emit();
+  }
 }
