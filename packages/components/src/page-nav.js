@@ -3,7 +3,7 @@ import { LitElement, html, css } from "lit";
 import { StoreController } from "./store-controller.js";
 
 export class PageNav extends LitElement {
-  store = new StoreController(this);
+  #store = new StoreController(this);
 
   static styles = css`
     :host {
@@ -16,17 +16,17 @@ export class PageNav extends LitElement {
   `;
 
   #prev() {
-    const state = this.store.value.state;
-    this.store.value.setPage(state.currentPage - 1);
+    const state = this.#store.value.state;
+    this.#store.value.setPage(state.currentPage - 1);
   }
 
   #next() {
-    const state = this.store.value.state;
-    this.store.value.setPage(state.currentPage + 1);
+    const state = this.#store.value.state;
+    this.#store.value.setPage(state.currentPage + 1);
   }
 
   render() {
-    const state = this.store.value?.state;
+    const state = this.#store.value?.state;
     if (!state || !state.pageCount) return html``;
 
     return html`

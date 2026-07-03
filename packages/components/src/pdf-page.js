@@ -10,10 +10,11 @@ export class PdfPage extends LitElement {
     _view: { state: true },
   };
 
-  store = new StoreController(this);
+  #store = new StoreController(this);
 
   constructor() {
     super();
+
     this._scale = 1;
     this._view = null;
     this._renderedPage = null;
@@ -54,7 +55,7 @@ export class PdfPage extends LitElement {
   }
 
   updated() {
-    const state = this.store.value?.state;
+    const state = this.#store.value?.state;
 
     if (!state || !state.document) return;
 
@@ -65,7 +66,7 @@ export class PdfPage extends LitElement {
   }
 
   async #renderPage() {
-    const state = this.store.value?.state;
+    const state = this.#store.value?.state;
     if (!state || !state.document) return;
 
     const page = await state.document.getPage(state.currentPage);
@@ -79,7 +80,7 @@ export class PdfPage extends LitElement {
   }
 
   #onClick(event) {
-    const store = this.store.value;
+    const store = this.#store.value;
 
     if (!store || store.state.toolMode !== "text" || !this._view) return;
 
@@ -98,7 +99,7 @@ export class PdfPage extends LitElement {
   }
 
   render() {
-    const state = this.store.value?.state;
+    const state = this.#store.value?.state;
 
     const boxes = state
       ? state.textBoxes.filter((box) => box.page === state.currentPage)

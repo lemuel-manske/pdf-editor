@@ -8,9 +8,10 @@ import "./page-nav.js";
 
 export class PdfEditor extends LitElement {
   #provider = new ContextProvider(this, { context: storeContext });
+  #store = null;
 
   #onKeyDown = (event) => {
-    if (event.key === "Escape") this._store?.select(null);
+    if (event.key === "Escape") this.#store?.select(null);
   };
 
   static styles = css`
@@ -44,15 +45,11 @@ export class PdfEditor extends LitElement {
     window.removeEventListener("keydown", this.#onKeyDown);
   }
 
-  set store(value) {
-    this._store = value;
-    this.#provider.setValue(value);
+  setStore(store) {
+    this.#store = store;
+    this.#provider.setValue(store);
 
     this.requestUpdate();
-  }
-
-  get store() {
-    return this._store;
   }
 
   render() {

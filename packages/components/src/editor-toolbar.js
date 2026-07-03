@@ -3,7 +3,7 @@ import { LitElement, html, css } from "lit";
 import { StoreController } from "./store-controller.js";
 
 export class EditorToolbar extends LitElement {
-  store = new StoreController(this);
+  #store = new StoreController(this);
   #fileName;
 
   static styles = css`
@@ -36,37 +36,37 @@ export class EditorToolbar extends LitElement {
 
     file
       .arrayBuffer()
-      .then((buffer) => this.store.value.openDocument(new Uint8Array(buffer)));
+      .then((buffer) => this.#store.value.openDocument(new Uint8Array(buffer)));
 
     event.target.value = "";
   }
 
   #toggleText() {
-    const store = this.store.value;
+    const store = this.#store.value;
 
     store.setToolMode(store.state.toolMode === "text" ? "select" : "text");
   }
 
   #changeSize(event) {
-    this.store.value.setStyle(this.store.value.state.selectedId, {
+    this.#store.value.setStyle(this.#store.value.state.selectedId, {
       fontSizePt: Number(event.target.value),
     });
   }
 
   #changeColor(event) {
-    this.store.value.setStyle(this.store.value.state.selectedId, {
+    this.#store.value.setStyle(this.#store.value.state.selectedId, {
       color: event.target.value,
     });
   }
 
   #export() {
-    this.store.value
+    this.#store.value
       .exportPdf()
       .then((bytes) => downloadPdf(bytes, this.#fileName));
   }
 
   render() {
-    const state = this.store.value?.state;
+    const state = this.#store.value?.state;
 
     const selected = state?.textBoxes.find(
       (box) => box.id === state.selectedId,

@@ -9,10 +9,11 @@ export class TextBox extends LitElement {
     scale: { attribute: false },
   };
 
-  store = new StoreController(this);
+  #store = new StoreController(this);
 
   constructor() {
     super();
+
     this.scale = 1;
   }
 
@@ -47,13 +48,13 @@ export class TextBox extends LitElement {
   `;
 
   #onInput(event) {
-    this.store.value.editText(this.box.id, event.target.innerText);
+    this.#store.value.editText(this.box.id, event.target.innerText);
   }
 
   #onPointerDown(event) {
     event.stopPropagation();
 
-    this.store.value.select(this.box.id);
+    this.#store.value.select(this.box.id);
 
     const start = { x: event.clientX, y: event.clientY };
 
@@ -68,7 +69,7 @@ export class TextBox extends LitElement {
         y: origin.y + (moveEvent.clientY - start.y),
       };
 
-      this.store.value.moveTextBox(this.box.id, this.view.screenToPdf(screen));
+      this.#store.value.moveTextBox(this.box.id, this.view.screenToPdf(screen));
     };
 
     const stop = () => {
@@ -83,19 +84,19 @@ export class TextBox extends LitElement {
   #onDelete(event) {
     event.stopPropagation();
 
-    this.store.value.deleteTextBox(this.box.id);
+    this.#store.value.deleteTextBox(this.box.id);
   }
 
   firstUpdated() {
     this._editable = this.renderRoot.querySelector(".editable");
     this._editable.innerText = this.box.text;
 
-    if (this.store.value?.state.selectedId === this.box.id)
+    if (this.#store.value?.state.selectedId === this.box.id)
       this._editable.focus();
   }
 
   updated() {
-    const selected = this.store.value?.state.selectedId === this.box.id;
+    const selected = this.#store.value?.state.selectedId === this.box.id;
 
     this.toggleAttribute("selected", selected);
 
