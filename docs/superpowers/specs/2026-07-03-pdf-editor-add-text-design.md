@@ -189,11 +189,12 @@ A box is rendered only when `box.page === currentPage`.
 
 ## 8. Coordinate transform (the core logic)
 
-- **Screen → PDF point** (on create/move): use the page's PDF.js `viewport`
-  (`page.getViewport({ scale })`) and `viewport.convertToPdfPoint(x, y)`, wrapped
-  in `coords.js` for testability.
-- **PDF point → screen** (on render): `viewport.convertToViewportPoint(xPt, yPt)`
-  to position each `<text-box>` over the canvas.
+- **`coords.screenToPdf(point, viewport)`** (on create/move): use the page's
+  PDF.js `viewport` (`page.getViewport({ scale })`) and
+  `viewport.convertToPdfPoint(x, y)`, wrapped for testability.
+- **`coords.pdfToScreen(point, viewport)`** (on render):
+  `viewport.convertToViewportPoint(xPt, yPt)` to position each `<text-box>` over
+  the canvas.
 - **Baseline offset:** display positions a box by its top-left; pdf-lib draws from
   the baseline. `coords.js` applies a consistent font-ascent offset so display and
   export agree.
@@ -212,6 +213,8 @@ A box is rendered only when `box.page === currentPage`.
 
 - **Add:** with the Text tool active, clicking empty page area creates a box at
   that point (converted to PDF points), selects it, and focuses it for typing.
+  The tool then reverts to select mode so the new box can be moved/edited
+  immediately (placing another box requires re-activating the Text tool).
 - **Edit:** typing in a selected box updates its text in the store.
 - **Move:** dragging a box updates its point position in the store.
 - **Style:** the toolbar's font-size/color apply to the selected box and become
