@@ -47,6 +47,12 @@ export class DocumentStore {
     this.#emit();
   }
 
+  setPage(n) {
+    if (n < 1 || n > this.#state.pageCount) return;
+    this.#state.currentPage = n;
+    this.#emit();
+  }
+
   addTextBox({ page, xPt, yPt }) {
     this.#idCounter += 1;
     const box = createTextBox({

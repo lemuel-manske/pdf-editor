@@ -152,3 +152,26 @@ describe('DocumentStore.deleteTextBox', () => {
     expect(store.state.selectedId).toBe(null);
   });
 });
+
+describe('DocumentStore.setPage', () => {
+  it('moves to a page within range', async () => {
+    const store = makeStore();
+    await store.openDocument(new Uint8Array([9]));
+    store.setPage(2);
+    expect(store.state.currentPage).toBe(2);
+  });
+
+  it('ignores a page above the range', async () => {
+    const store = makeStore();
+    await store.openDocument(new Uint8Array([9]));
+    store.setPage(99);
+    expect(store.state.currentPage).toBe(1);
+  });
+
+  it('ignores a page below the range', async () => {
+    const store = makeStore();
+    await store.openDocument(new Uint8Array([9]));
+    store.setPage(0);
+    expect(store.state.currentPage).toBe(1);
+  });
+});
