@@ -2,14 +2,20 @@
   "name": "pdf-editor-monorepo",
   "private": true,
   "type": "module",
-  "workspaces": ["packages/*", "apps/*"],
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
   "scripts": {
     "test": "vitest run",
     "dev": "npm run dev -w web",
-    "build": "npm run build -w web"
+    "build": "npm run build -w web",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
   },
   "devDependencies": {
-    "vitest": "^4.1.9",
-    "jsdom": "^29.1.1"
+    "jsdom": "29.1.1",
+    "prettier": "3.9.4",
+    "vitest": "4.1.9"
   }
 }
