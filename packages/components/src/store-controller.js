@@ -1,11 +1,18 @@
 import { ContextConsumer } from "@lit/context";
+
 import { storeContext } from "./store-context.js";
 
+/**
+ * Responsible for subscribing to the store context and updating
+ * the host component when the store state changes.
+ */
 export class StoreController {
   constructor(host) {
     this.host = host;
     host.addController(this);
+
     this._unsubscribe = null;
+
     new ContextConsumer(host, {
       context: storeContext,
       subscribe: true,
@@ -17,15 +24,18 @@ export class StoreController {
     return this._store;
   }
 
-  #attach(store) {
-    if (this._unsubscribe) this._unsubscribe();
-    this._store = store;
-    this._unsubscribe = store.subscribe(() => this.host.requestUpdate());
-    this.host.requestUpdate();
-  }
-
   hostDisconnected() {
     if (this._unsubscribe) this._unsubscribe();
+
     this._unsubscribe = null;
+  }
+
+  #attach(store) {
+    if (this._unsubscribe) this._unsubscribe();
+
+    this._store = store;
+    this._unsubscribe = store.subscribe(() => this.host.requestUpdate());
+
+    this.host.requestUpdate();
   }
 }

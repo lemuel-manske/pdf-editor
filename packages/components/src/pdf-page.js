@@ -1,5 +1,6 @@
 import { LitElement, html, css } from "lit";
 import { repeat } from "lit/directives/repeat.js";
+
 import { StoreController } from "./store-controller.js";
 import "./text-box.js";
 
@@ -24,14 +25,17 @@ export class PdfPage extends LitElement {
     :host {
       display: block;
     }
+
     .frame {
       position: relative;
       width: 100%;
     }
+
     .canvas-host .canvas {
       display: block;
       box-shadow: 0 0 8px rgba(0, 0, 0, 0.25);
     }
+
     .overlay {
       position: absolute;
       inset: 0;
@@ -51,7 +55,9 @@ export class PdfPage extends LitElement {
 
   updated() {
     const state = this.store.value?.state;
+
     if (!state || !state.document) return;
+
     if (state.currentPage !== this._renderedPage) {
       this._renderedPage = state.currentPage;
       this.#renderPage();
@@ -74,13 +80,16 @@ export class PdfPage extends LitElement {
 
   #onClick(event) {
     const store = this.store.value;
+
     if (!store || store.state.toolMode !== "text" || !this._view) return;
 
     const rect = this._canvas.getBoundingClientRect();
+
     const point = this._view.screenToPdf({
       x: event.clientX - rect.left,
       y: event.clientY - rect.top,
     });
+
     store.addTextBox({
       page: store.state.currentPage,
       xPt: point.xPt,
@@ -90,6 +99,7 @@ export class PdfPage extends LitElement {
 
   render() {
     const state = this.store.value?.state;
+
     const boxes = state
       ? state.textBoxes.filter((box) => box.page === state.currentPage)
       : [];

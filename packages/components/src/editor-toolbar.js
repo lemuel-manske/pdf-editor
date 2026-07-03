@@ -1,4 +1,5 @@
 import { LitElement, html, css } from "lit";
+
 import { StoreController } from "./store-controller.js";
 
 export class EditorToolbar extends LitElement {
@@ -13,10 +14,12 @@ export class EditorToolbar extends LitElement {
       padding: 8px;
       border-bottom: 1px solid #ddd;
     }
+
     button.active {
       background: #4a90d9;
       color: #fff;
     }
+
     label {
       display: inline-flex;
       gap: 4px;
@@ -26,16 +29,21 @@ export class EditorToolbar extends LitElement {
 
   #openFile(event) {
     const file = event.target.files[0];
+
     if (!file) return;
+
     this.#fileName = file.name;
+
     file
       .arrayBuffer()
       .then((buffer) => this.store.value.openDocument(new Uint8Array(buffer)));
+
     event.target.value = "";
   }
 
   #toggleText() {
     const store = this.store.value;
+
     store.setToolMode(store.state.toolMode === "text" ? "select" : "text");
   }
 
@@ -59,13 +67,17 @@ export class EditorToolbar extends LitElement {
 
   render() {
     const state = this.store.value?.state;
+
     const selected = state?.textBoxes.find(
       (box) => box.id === state.selectedId,
     );
+
     const size = selected
       ? selected.fontSizePt
       : (state?.style.fontSizePt ?? 16);
+
     const color = selected ? selected.color : (state?.style.color ?? "#000000");
+
     const disabled = !state?.document;
 
     return html`

@@ -38,12 +38,14 @@ export class DocumentStore {
 
   async openDocument(bytes) {
     const document = await this.#renderer.loadDocument(bytes);
+
     this.#state.pdfBytes = bytes;
     this.#state.document = document;
     this.#state.pageCount = document.pageCount;
     this.#state.currentPage = 1;
     this.#state.textBoxes = [];
     this.#state.selectedId = null;
+
     this.#emit();
   }
 
@@ -55,6 +57,7 @@ export class DocumentStore {
 
   addTextBox({ page, xPt, yPt }) {
     this.#idCounter += 1;
+
     const box = createTextBox({
       id: `t${this.#idCounter}`,
       page,
@@ -63,10 +66,13 @@ export class DocumentStore {
       fontSizePt: this.#state.style.fontSizePt,
       color: this.#state.style.color,
     });
+
     this.#state.textBoxes = [...this.#state.textBoxes, box];
     this.#state.selectedId = box.id;
     this.#state.toolMode = "select";
+
     this.#emit();
+
     return box;
   }
 
