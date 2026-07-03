@@ -101,4 +101,8 @@ export class DocumentStore {
     this.#state.toolMode = mode;
     this.#emit();
   }
+
+  async exportPdf() {
+    return this.#exporter.exportPdf(this.#state.pdfBytes, this.#state.textBoxes);
+  }
 }

@@ -192,3 +192,23 @@ describe('DocumentStore.setToolMode', () => {
     expect(store.state.toolMode).toBe('select');
   });
 });
+
+describe('DocumentStore.exportPdf', () => {
+  it('hands the retained bytes and boxes to the exporter', async () => {
+    const exporter = fakeExporter();
+    const store = new DocumentStore({ renderer: fakeRenderer(), exporter });
+    const bytes = new Uint8Array([7]);
+    await store.openDocument(bytes);
+    store.addTextBox({ page: 1, xPt: 0, yPt: 0 });
+    await store.exportPdf();
+    expect(exporter.calls[0]).toEqual({ bytes, boxes: store.state.textBoxes });
+  });
+
+  it('returns the exporter output', async () => {
+    const exporter = fakeExporter(new Uint8Array([42]));
+    const store = new DocumentStore({ renderer: fakeRenderer(), exporter });
+    await store.openDocument(new Uint8Array([7]));
+    const out = await store.exportPdf();
+    expect(out).toEqual(new Uint8Array([42]));
+  });
+});
