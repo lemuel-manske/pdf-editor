@@ -7,8 +7,6 @@ const require = createRequire(import.meta.url);
 const workerSrc = require.resolve("pdfjs-dist/legacy/build/pdf.worker.mjs");
 
 async function makeFixture() {
-  const doc = await PDFDocument.create();
-  doc.addPage([200, 300]);
   const withText = await PDFDocument.create();
   const page = withText.addPage([200, 300]);
   const font = await withText.embedFont(StandardFonts.Helvetica);
@@ -40,7 +38,9 @@ describe("createPdfReader loadDocument", () => {
 
   it("does not detach the caller bytes", async () => {
     const reader = createPdfReader({ workerSrc });
-    await reader.loadDocument(fixture);
-    expect(fixture.byteLength).toBe(fixture.length);
+    const bytes = await makeFixture();
+    const before = bytes.byteLength;
+    await reader.loadDocument(bytes);
+    expect(bytes.byteLength).toBe(before);
   });
 });
