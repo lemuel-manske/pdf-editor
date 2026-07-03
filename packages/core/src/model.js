@@ -1,5 +1,5 @@
 export const DEFAULT_FONT_SIZE_PT = 16;
-export const DEFAULT_COLOR = '#000000';
+export const DEFAULT_COLOR = "#000000";
 
 /**
  * @typedef {Object} TextBox
@@ -13,6 +13,14 @@ export const DEFAULT_COLOR = '#000000';
  */
 
 /** @returns {TextBox} */
-export function createTextBox({ id, page, xPt, yPt, text = '', fontSizePt = DEFAULT_FONT_SIZE_PT, color = DEFAULT_COLOR }) {
+export function createTextBox({
+  id,
+  page,
+  xPt,
+  yPt,
+  text = "",
+  fontSizePt = DEFAULT_FONT_SIZE_PT,
+  color = DEFAULT_COLOR,
+}) {
   return { id, page, xPt, yPt, text, fontSizePt, color };
 }

@@ -1,4 +1,4 @@
-import { createTextBox, DEFAULT_FONT_SIZE_PT, DEFAULT_COLOR } from './model.js';
+import { createTextBox, DEFAULT_FONT_SIZE_PT, DEFAULT_COLOR } from "./model.js";
 
 export class DocumentStore {
   #renderer;
@@ -11,7 +11,7 @@ export class DocumentStore {
     document: null,
     pageCount: 0,
     currentPage: 1,
-    toolMode: 'select',
+    toolMode: "select",
     textBoxes: [],
     selectedId: null,
     style: { fontSizePt: DEFAULT_FONT_SIZE_PT, color: DEFAULT_COLOR },
@@ -65,7 +65,7 @@ export class DocumentStore {
     });
     this.#state.textBoxes = [...this.#state.textBoxes, box];
     this.#state.selectedId = box.id;
-    this.#state.toolMode = 'select';
+    this.#state.toolMode = "select";
     this.#emit();
     return box;
   }
@@ -76,18 +76,24 @@ export class DocumentStore {
   }
 
   moveTextBox(id, { xPt, yPt }) {
-    this.#state.textBoxes = this.#state.textBoxes.map((b) => (b.id === id ? { ...b, xPt, yPt } : b));
+    this.#state.textBoxes = this.#state.textBoxes.map((b) =>
+      b.id === id ? { ...b, xPt, yPt } : b,
+    );
     this.#emit();
   }
 
   editText(id, text) {
-    this.#state.textBoxes = this.#state.textBoxes.map((b) => (b.id === id ? { ...b, text } : b));
+    this.#state.textBoxes = this.#state.textBoxes.map((b) =>
+      b.id === id ? { ...b, text } : b,
+    );
     this.#emit();
   }
 
   setStyle(id, style) {
     this.#state.style = { ...this.#state.style, ...style };
-    this.#state.textBoxes = this.#state.textBoxes.map((b) => (b.id === id ? { ...b, ...style } : b));
+    this.#state.textBoxes = this.#state.textBoxes.map((b) =>
+      b.id === id ? { ...b, ...style } : b,
+    );
     this.#emit();
   }
 
@@ -103,6 +109,9 @@ export class DocumentStore {
   }
 
   async exportPdf() {
-    return this.#exporter.exportPdf(this.#state.pdfBytes, this.#state.textBoxes);
+    return this.#exporter.exportPdf(
+      this.#state.pdfBytes,
+      this.#state.textBoxes,
+    );
   }
 }
