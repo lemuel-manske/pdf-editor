@@ -44,3 +44,23 @@ describe("createPdfReader loadDocument", () => {
     expect(bytes.byteLength).toBe(before);
   });
 });
+
+describe("PageView conversions", () => {
+  it("maps the screen top-left to the top of the page", async () => {
+    const reader = createPdfReader({ workerSrc });
+    const doc = await reader.loadDocument(fixture);
+    const page = await doc.getPage(1);
+    const view = page.getView(1);
+    expect(view.screenToPdf({ x: 0, y: 0 }).yPt).toBe(300);
+  });
+
+  it("round-trips a point back to the same screen pixel", async () => {
+    const reader = createPdfReader({ workerSrc });
+    const doc = await reader.loadDocument(fixture);
+    const page = await doc.getPage(1);
+    const view = page.getView(1.5);
+    const point = view.screenToPdf({ x: 30, y: 40 });
+    const back = view.pdfToScreen(point);
+    expect(Math.hypot(back.x - 30, back.y - 40)).toBeCloseTo(0, 5);
+  });
+});
