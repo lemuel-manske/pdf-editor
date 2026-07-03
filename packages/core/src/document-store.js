@@ -96,4 +96,9 @@ export class DocumentStore {
     if (this.#state.selectedId === id) this.#state.selectedId = null;
     this.#emit();
   }
+
+  setToolMode(mode) {
+    this.#state.toolMode = mode;
+    this.#emit();
+  }
 }

@@ -175,3 +175,20 @@ describe('DocumentStore.setPage', () => {
     expect(store.state.currentPage).toBe(1);
   });
 });
+
+describe('DocumentStore.setToolMode', () => {
+  it('activates the text tool', async () => {
+    const store = makeStore();
+    await store.openDocument(new Uint8Array([9]));
+    store.setToolMode('text');
+    expect(store.state.toolMode).toBe('text');
+  });
+
+  it('reverts to select after a box is added', async () => {
+    const store = makeStore();
+    await store.openDocument(new Uint8Array([9]));
+    store.setToolMode('text');
+    store.addTextBox({ page: 1, xPt: 0, yPt: 0 });
+    expect(store.state.toolMode).toBe('select');
+  });
+});
