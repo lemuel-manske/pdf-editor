@@ -37,7 +37,7 @@ function drawBox(page, font, box) {
   });
 }
 
-export function hexToRgb(hex) {
+function hexToRgb(hex) {
   const clean = hex.replace("#", "");
   const channel = (start) => parseInt(clean.slice(start, start + 2), 16) / 255;
   return rgb(channel(0), channel(2), channel(4));
