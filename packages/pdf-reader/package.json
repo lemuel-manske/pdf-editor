@@ -3,11 +3,13 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "exports": { ".": "./src/index.js" },
+  "exports": {
+    ".": "./src/index.js"
+  },
   "dependencies": {
-    "pdfjs-dist": "^6.1.200"
+    "pdfjs-dist": "6.1.200"
   },
   "devDependencies": {
-    "pdf-lib": "^1.17.1"
+    "pdf-lib": "1.17.1"
   }
 }
