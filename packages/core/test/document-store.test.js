@@ -115,3 +115,22 @@ describe('DocumentStore.editText', () => {
     expect(edited.text).toBe('hello');
   });
 });
+
+describe('DocumentStore.setStyle', () => {
+  it('restyles the target box', async () => {
+    const store = makeStore();
+    await store.openDocument(new Uint8Array([9]));
+    const box = store.addTextBox({ page: 1, xPt: 0, yPt: 0 });
+    store.setStyle(box.id, { fontSizePt: 32 });
+    const styled = store.state.textBoxes.find((b) => b.id === box.id);
+    expect(styled.fontSizePt).toBe(32);
+  });
+
+  it('remembers the style as the default for new boxes', async () => {
+    const store = makeStore();
+    await store.openDocument(new Uint8Array([9]));
+    store.setStyle(null, { color: '#00ff00' });
+    const next = store.addTextBox({ page: 1, xPt: 0, yPt: 0 });
+    expect(next.color).toBe('#00ff00');
+  });
+});

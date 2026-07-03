@@ -78,4 +78,10 @@ export class DocumentStore {
     this.#state.textBoxes = this.#state.textBoxes.map((b) => (b.id === id ? { ...b, text } : b));
     this.#emit();
   }
+
+  setStyle(id, style) {
+    this.#state.style = { ...this.#state.style, ...style };
+    this.#state.textBoxes = this.#state.textBoxes.map((b) => (b.id === id ? { ...b, ...style } : b));
+    this.#emit();
+  }
 }
