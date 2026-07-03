@@ -53,3 +53,43 @@ describe('DocumentStore.subscribe', () => {
     expect(calls).toBe(0);
   });
 });
+
+describe('DocumentStore.addTextBox', () => {
+  it('adds a box on the requested page at the requested point', async () => {
+    const store = makeStore();
+    await store.openDocument(new Uint8Array([9]));
+    const box = store.addTextBox({ page: 1, xPt: 40, yPt: 700 });
+    expect({ page: box.page, xPt: box.xPt, yPt: box.yPt }).toEqual({ page: 1, xPt: 40, yPt: 700 });
+  });
+
+  it('selects the newly added box', async () => {
+    const store = makeStore();
+    await store.openDocument(new Uint8Array([9]));
+    const box = store.addTextBox({ page: 1, xPt: 40, yPt: 700 });
+    expect(store.state.selectedId).toBe(box.id);
+  });
+
+  it('applies the current default style', async () => {
+    const store = makeStore();
+    await store.openDocument(new Uint8Array([9]));
+    const box = store.addTextBox({ page: 1, xPt: 0, yPt: 0 });
+    expect(box.fontSizePt).toBe(16);
+  });
+
+  it('gives each box a distinct id', async () => {
+    const store = makeStore();
+    await store.openDocument(new Uint8Array([9]));
+    const a = store.addTextBox({ page: 1, xPt: 0, yPt: 0 });
+    const b = store.addTextBox({ page: 1, xPt: 0, yPt: 0 });
+    expect(a.id === b.id).toBe(false);
+  });
+});
+
+describe('DocumentStore.select', () => {
+  it('sets the selected id', async () => {
+    const store = makeStore();
+    await store.openDocument(new Uint8Array([9]));
+    store.select('t7');
+    expect(store.state.selectedId).toBe('t7');
+  });
+});

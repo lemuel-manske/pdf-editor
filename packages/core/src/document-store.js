@@ -1,4 +1,4 @@
-import { DEFAULT_FONT_SIZE_PT, DEFAULT_COLOR } from './model.js';
+import { createTextBox, DEFAULT_FONT_SIZE_PT, DEFAULT_COLOR } from './model.js';
 
 export class DocumentStore {
   #renderer;
@@ -44,6 +44,28 @@ export class DocumentStore {
     this.#state.currentPage = 1;
     this.#state.textBoxes = [];
     this.#state.selectedId = null;
+    this.#emit();
+  }
+
+  addTextBox({ page, xPt, yPt }) {
+    this.#idCounter += 1;
+    const box = createTextBox({
+      id: `t${this.#idCounter}`,
+      page,
+      xPt,
+      yPt,
+      fontSizePt: this.#state.style.fontSizePt,
+      color: this.#state.style.color,
+    });
+    this.#state.textBoxes = [...this.#state.textBoxes, box];
+    this.#state.selectedId = box.id;
+    this.#state.toolMode = 'select';
+    this.#emit();
+    return box;
+  }
+
+  select(id) {
+    this.#state.selectedId = id;
     this.#emit();
   }
 }
