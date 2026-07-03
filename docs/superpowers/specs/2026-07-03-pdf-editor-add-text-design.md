@@ -118,7 +118,7 @@ pdf-editor/                         # monorepo root
    │  │  ├─ document-store.js       # state + intent methods + subscribe; injected ports
    │  │  ├─ model.js                # TextBox factory + typedef
    │  │  └─ ports/
-   │  │     ├─ pdf-renderer.js      # PdfRenderer / PdfDocument / PdfPage / RenderedPage typedefs
+   │  │     ├─ pdf-renderer.js      # PdfRenderer / PdfDocument / PdfPage / PageView typedefs
    │  │     └─ pdf-exporter.js      # PdfExporter typedef
    │  └─ test/document-store.test.js  # fake adapters (stubs)
    ├─ pdf-reader/
@@ -165,10 +165,11 @@ PdfDocument = {
 PdfPage = {
   widthPt: number,
   heightPt: number,
-  renderTo(canvas: HTMLCanvasElement, scale: number) : Promise<RenderedPage>,
+  getView(scale) : PageView,          // geometry + conversions, no canvas needed
+  renderTo(canvas, scale) : Promise<void>,   // rasterize pixels into the canvas
 }
 
-RenderedPage = {                     // a page rendered at a specific scale
+PageView = {                          // page geometry at a specific scale
   widthPx: number,
   heightPx: number,
   screenToPdf({ x, y })  : { xPt, yPt },
@@ -177,8 +178,9 @@ RenderedPage = {                     // a page rendered at a specific scale
 ```
 
 The renderer owns coordinate conversion (it holds the PDF.js viewport), so the
-domain and components never do viewport math. `RenderedPage` captures the
-scale-specific conversions produced by one render.
+domain and components never do viewport math. `getView(scale)` returns the
+scale-specific geometry/conversions *without* rasterizing (so it is testable in
+Node without a canvas); `renderTo` paints pixels into a canvas.
 
 ### `PdfExporter` (implemented by `@pdf-editor/pdf-writer`)
 
@@ -219,7 +221,7 @@ TextBox = { id, page, xPt, yPt, text, fontSizePt, color }
   (bottom-left origin, zoom-independent) as the single source of truth.
 
 **Scale is a view concern, not domain state.** Fit-to-width scale and the current
-`RenderedPage` are held locally in `<pdf-page>`, which measures its container.
+`PageView` are held locally in `<pdf-page>`, which measures its container.
 
 ## 7. Adapters
 
@@ -227,8 +229,8 @@ TextBox = { id, page, xPt, yPt, text, fontSizePt, color }
 
 `createPdfReader({ workerSrc }) : PdfRenderer`. Wraps `pdfjs-dist`. The worker URL
 is passed in by the composition root (keeps the adapter free of Vite-specific
-`?url` syntax). Implements `loadDocument`/`getPage`/`renderTo` and builds
-`RenderedPage` conversions from the PDF.js `viewport`
+`?url` syntax). Implements `loadDocument`/`getPage`/`getView`/`renderTo` and builds
+`PageView` conversions from the PDF.js `viewport`
 (`viewport.convertToPdfPoint` / `convertToViewportPoint`).
 
 ### `@pdf-editor/pdf-writer` (pdf-lib)
@@ -243,7 +245,7 @@ offset) and hex→`rgb()` color. Returns the new bytes.
 ## 8. UI — `@pdf-editor/components` (Lit)
 
 Components are thin views. They import the store contract from
-`@pdf-editor/core`, read/call it through the controller, and use `RenderedPage`
+`@pdf-editor/core`, read/call it through the controller, and use `PageView`
 (a port object) for rendering/conversion — they never import PDF.js or pdf-lib.
 
 - **`store-context.js`** — `export const storeContext = createContext(...)`.
@@ -258,10 +260,10 @@ Components are thin views. They import the store contract from
   color picker · Export. Size/color apply to the selected box and set defaults
   for new boxes.
 - **`pdf-page.js`** — measures its container for a fit-to-width scale; fetches the
-  current `PdfPage` and calls `renderTo(canvas, scale)` into a **stable** canvas
-  node (imperative, so reactive re-render never recreates it); keeps the resulting
-  `RenderedPage` for conversions; maps a click (Text tool active) to a PDF point
-  via `renderedPage.screenToPdf` and calls `store.addTextBox`.
+  current `PdfPage`, calls `renderTo(canvas, scale)` into a **stable** canvas
+  node (imperative, so reactive re-render never recreates it), and keeps the
+  `getView(scale)` result for conversions; maps a click (Text tool active) to a
+  PDF point via `view.screenToPdf` and calls `store.addTextBox`.
 - **`text-box.js`** — one `contenteditable` element: drag to move, type to edit,
   ✕ / Delete to remove, click to select. Reads its data from the store.
 - **`page-nav.js`** — prev/next + page counter.
